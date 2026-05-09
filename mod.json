@@ -1,0 +1,13 @@
+{
+    "id": "UBERENHANCED",
+    "name": "UberEnhanced",
+    "display_name": "UberEnhanced",
+    "author": ["FatalError404X"],
+    "description": "This mod adds new enhancements to balatro.",
+    "prefix": "Uber",
+    "main_file": "main.lua",
+    "priority": 0,
+    "badge_colour": "ff5599",
+    "version": "1.0.0",
+    "dependencies": []
+}
