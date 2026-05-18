@@ -12,6 +12,20 @@ SMODS.Atlas{
     py = 95
 }
 
+SMODS.Atlas{
+    key = 'Decks',
+    path = 'Decks.png',
+    px = 71,
+    py = 95
+}
+
+SMODS.Atlas{
+    key = 'Jokers',
+    path = 'Jokers.png',
+    px = 71,
+    py = 95
+}
+
 SMODS.Enhancement{
     key = 'NewEnhancer1',
     atlas = 'Enhancer',
@@ -519,5 +533,202 @@ SMODS.Consumable {
     can_use = function(self, card)
         return G.consumeables and #G.consumeables.cards < G.consumeables.config.card_limit or
             (card.area == G.consumeables)
+    end
+}
+
+SMODS.Joker{
+    key = 'UberJoker1',
+    atlas = 'Jokers',
+    rarity = 3,
+    discovered = true,
+    pos = {x = 0, y = 0},
+    loc_txt = {
+        name = 'Shooting Star',
+        text = {
+            '{C:blue}+#1#{} chips',
+            'when a {X:attention,C:white}Star Card{} is scored',
+            'Retrigger all played {X:attention,C:white}Star Cards{} once'
+        }
+    },
+    config = {
+        mod_conv = 'm_Uber_NewEnhancer2',
+        extra = {
+            chips = 30
+        }
+    },
+    loc_vars = function(self, info_queue, card)
+        info_queue[#info_queue + 1] = G.P_CENTERS[card.ability.mod_conv]
+        return {
+            vars = {
+                card.ability.extra.chips
+            }
+        }
+    end,
+    calculate = function(self, card, context)
+        if context.repetition and context.cardarea == G.play and SMODS.has_enhancement(context.other_card, 'm_Uber_NewEnhancer2') then
+            return {
+                chips = card.ability.extra.chips,
+                repetitions = 1
+            }
+        end
+    end
+}
+
+SMODS.Joker{
+    key = 'UberJoker2',
+    atlas = 'Jokers',
+    rarity = 2,
+    discovered = true,
+    pos = {x = 1, y = 0},
+    loc_txt = {
+        name = 'Bronze Joker',
+        text = {
+            'Gives {X:blue,C:white}X#1#{} chips',
+            'for each {C:attention}Bronze Card{}',
+            'in your {C:attention}full deck{}',
+            '{C:inactive}(currently{} {X:blue,C:white}X#2#{} {C:inactive}chips){}'
+        }
+    },
+    config = {
+        mod_conv = 'm_Uber_NewEnhancer1',
+        extra = {
+            xchips = 0.3,
+            bonus_x_chips = 1
+        }
+    },
+    loc_vars = function(self, info_queue, card)
+        info_queue[#info_queue + 1] = G.P_CENTERS[card.ability.mod_conv]
+
+        local bronze_tally = 0
+        if G.playing_cards then
+            for _, playing_card in ipairs(G.playing_cards) do
+                if SMODS.has_enhancement(playing_card, 'm_Uber_NewEnhancer1') then bronze_tally = bronze_tally + 1 end
+            end
+        end
+        return { vars = { card.ability.extra.xchips, 1 + card.ability.extra.xchips * bronze_tally } }
+    end,
+    calculate = function(self, card, context)
+        if context.joker_main then
+            local bronze_tally = 0
+            for _, playing_card in ipairs(G.playing_cards) do
+                if SMODS.has_enhancement(playing_card, 'm_Uber_NewEnhancer1') then bronze_tally = bronze_tally + 1 end
+            end
+            return {
+                x_chips = 1 + card.ability.extra.xchips * bronze_tally,
+            }
+        end
+    end
+}
+
+SMODS.Joker{
+    key = 'UberJoker3',
+    atlas = 'Jokers',
+    rarity = 3,
+    discovered = true,
+    pos = {x = 2, y = 0},
+    loc_txt = {
+        name = 'Scholarly Notebook',
+        text = {
+            '{X:blue,C:white}+X#1#{} chips and {X:mult,C:white}+X#2#{} mult',
+            'for each {C:attention}Notepage{}',
+            'in the deck,',
+            '{C:attention}Notepages{} count as any suit',
+            '{C:inactive}(currently{} {X:blue,C:white}X#3#{} {C:inactive}chips and{} {X:mult,C:white}X#4#{} {C:inactive}mult){}'
+        }
+    },
+    config = {
+        mod_conv = 'm_Uber_NewEnhancer3',
+        extra = {
+            xchips = 0.1,
+            xmult = 0.1
+        }
+    },
+    loc_vars = function(self, info_queue, card)
+        info_queue[#info_queue + 1] = G.P_CENTERS[card.ability.mod_conv]
+
+        local note_tally = 0
+        if G.playing_cards then
+            for _, playing_card in ipairs(G.playing_cards) do
+                if SMODS.has_enhancement(playing_card, 'm_Uber_NewEnhancer3') then note_tally = note_tally + 1 end
+            end
+        end
+        return {
+            vars = {
+                card.ability.extra.xchips,
+                card.ability.extra.xmult,
+                1 + card.ability.extra.xchips * note_tally,
+                1 + card.ability.extra.xmult * note_tally,
+            }
+        }
+    end,
+    calculate = function(self, card, context)
+        local oldcardissuit = Card.is_suit
+        function Card:is_suit(suit, bypass_debuff, flush_calc)
+            local g = oldcardissuit(self, suit, bypass_debuff, flush_calc)
+            if next(SMODS.find_card('j_Uber_UberJoker3')) and SMODS.has_enhancement(self, 'm_Uber_NewEnhancer3') then return true end
+            return g
+        end
+        if context.joker_main then
+            local note_tally = 0
+            for _, playing_card in ipairs(G.playing_cards) do
+                if SMODS.has_enhancement(playing_card, 'm_Uber_NewEnhancer3') then note_tally = note_tally + 1 end
+            end
+            return {
+                x_chips = 1 + card.ability.extra.xchips * note_tally,
+                x_mult = 1 + card.ability.extra.xmult * note_tally
+            }
+        end
+    end
+}
+
+SMODS.Joker{
+    key = 'UberJoker4',
+    atlas = 'Jokers',
+    rarity = 3,
+    discovered = true,
+    pos = {x = 3, y = 0},
+    loc_txt = {
+        name = 'Break Through',
+        text = {
+            'Earn {C:money}$#1#{} when',
+            'a {C:attention}Brick Card{} is played',
+            'Played {C:attention}Brick Cards{} also',
+            'earn {C:money}+$#2#{} when scored'
+        }
+    },
+    config = {
+        mod_conv = 'm_Uber_NewEnhancer4',
+        extra = {
+            money = 3,
+            bonus_money = 1
+        }
+    },
+    loc_vars = function(self, info_queue, card)
+        info_queue[#info_queue + 1] = G.P_CENTERS[card.ability.mod_conv]
+        return {
+            vars = {
+                card.ability.extra.money,
+                card.ability.extra.bonus_money
+            }
+        }
+    end,
+    calculate = function(self, card, context)
+        if context.individual and context.cardarea == G.play then
+            for _, playing_card in ipairs(G.playing_cards) do
+                if SMODS.has_enhancement(playing_card, 'm_Uber_NewEnhancer4') then 
+                    context.other_card.ability.perma_p_dollars = context.other_card.ability.perma_p_dollars or 0
+                    context.other_card.ability.perma_p_dollars = context.other_card.ability.perma_p_dollars + card.ability.extra.bonus_money
+                end
+            end
+        end
+        if context.before then
+            for _, playing_card in ipairs(G.playing_cards) do
+                if SMODS.has_enhancement(playing_card, 'm_Uber_NewEnhancer4') then 
+                    return {
+                        p_dollars = card.ability.extra.money
+                    }
+                end
+            end
+        end
     end
 }
