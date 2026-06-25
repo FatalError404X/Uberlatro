@@ -13,10 +13,27 @@ SMODS.Atlas{
 }
 
 SMODS.Atlas{
+    key = 'Spectral2',
+    path = 'Spectral2.png',
+    px = 71,
+    py = 95
+}
+
+SMODS.Atlas{
     key = 'Decks',
     path = 'Decks.png',
     px = 71,
     py = 95
+}
+
+SMODS.Atlas{
+    key = 'Blinds',
+    path = 'Blinds.png',
+    px = 34,
+    py = 34,
+    atlas_table ='ANIMATION_ATLAS',
+    frames = 18,
+    fps = 10
 }
 
 SMODS.Atlas{
@@ -66,6 +83,24 @@ SMODS.ConsumableType{
  	},
     collection_rows = {4, 4, 4}
 }
+
+
+Uberlatro = SMODS.current_mod
+
+Uberlatro.optional_features = {
+    retrigger_joker = true,
+    post_trigger = true,
+    quantum_enhancements = true,
+    object_weights = true,
+    cardareas = {
+        discard = true,
+        deck = true
+    }
+}
+
+Uberlatro.set_debuff = function(card)
+    if card and card.seal and card.seal == 'Uber_UberSeal1' then return 'prevent_debuff' end
+end
 
 -- Enhancements and Tarots Below
 
@@ -782,6 +817,305 @@ SMODS.Consumable{
     end
 }
 
+SMODS.Consumable{
+    key = 'NewTarot8',
+    set = 'Tarot',
+    atlas = 'Tarot2',
+    cost = 5,
+    pos = {x = 2, y = 1},
+    loc_txt = {
+        name = 'The Interest',
+        text = {
+            'Gain {C:money}$#1#{} of sell value',
+            'after each round,',
+            'Earn 1/2 of previous',
+            'sell value at end of round.'
+        }
+    },
+    config = {
+        extra = {
+            money = 2
+        }
+    },
+    loc_vars = function(self, info_queue, card)
+        return { 
+            vars = {
+                card.ability.extra.money
+            } 
+        }
+    end,
+    calculate = function(self, card, context)
+        if context.end_of_round and context.game_over == false and context.main_eval and not context.blueprint then
+            -- See note about SMODS Scaling Manipulation on the wiki
+            card.ability.extra_value = card.ability.extra_value + card.ability.extra.money
+            card:set_cost()
+            return {
+                message = localize('k_val_up'),
+                colour = G.C.MONEY
+            }
+        end
+    end,
+    calc_dollar_bonus = function(self, card)
+        return card.ability.extra_value / 2
+    end
+}
+
+-- Seals and Spectral cards below
+
+SMODS.Seal{
+    key = 'UberSeal1',
+    atlas = 'Enhancer',
+    pos = {x = 1, y = 1},
+    badge_colour = HEX('A17A2B'),
+    loc_txt = {
+        name = 'Oaken Seal',
+        label = 'Oak Seal',
+        text = {
+            'This card is immune',
+            'to {C:red}Debuffs{}'
+        }
+    },
+    sound = { sound = 'timpani', per = 0.9, vol = 0.9 }
+}
+
+SMODS.Consumable{
+    key = 'UberSpectral1',
+    set = 'Spectral',
+    atlas = 'Spectral2',
+    pos = { x = 0, y = 0 },
+    loc_txt = {
+        name = 'Permanence',
+        text = {
+            'Add an {C:attention}Oaken Seal{}',
+            'to {C:attention}#1#{} selected',
+            'card in your hand'
+        }
+    },
+    config = { extra = { seal = 'Uber_UberSeal1' }, max_highlighted = 1 },
+    loc_vars = function(self, info_queue, card)
+        info_queue[#info_queue + 1] = G.P_SEALS[card.ability.extra.seal]
+        return { vars = { card.ability.max_highlighted } }
+    end,
+    use = function(self, card, area, copier)
+        local conv_card = G.hand.highlighted[1]
+        G.E_MANAGER:add_event(Event({
+            func = function()
+                play_sound('tarot1')
+                card:juice_up(0.3, 0.5)
+                return true
+            end
+        }))
+
+        G.E_MANAGER:add_event(Event({
+            trigger = 'after',
+            delay = 0.1,
+            func = function()
+                conv_card:set_seal(card.ability.extra.seal, nil, true)
+                return true
+            end
+        }))
+
+        delay(0.5)
+        G.E_MANAGER:add_event(Event({
+            trigger = 'after',
+            delay = 0.2,
+            func = function()
+                G.hand:unhighlight_all()
+                return true
+            end
+        }))
+    end,
+    draw = function(self, card, layer)
+        if (layer == 'card' or layer == 'both') and card.sprite_facing == 'front' then
+            card.children.center:draw_shader('booster', nil, card.ARGS.send_to_shader)
+        end
+    end
+}
+
+SMODS.Consumable{
+    key = 'UberSpectral2',
+    set = 'Spectral',
+    atlas = 'Spectral2',
+    pos = { x = 1, y = 0 },
+    loc_txt = {
+        name = 'Rift',
+        text = {
+            'Add {C:dark_edition}Negative{} effect to',
+            '{C:attention}#1#{} selected card in hand'
+        }
+    },
+    config = { max_highlighted = 1 },
+    loc_vars = function(self, info_queue, card)
+        info_queue[#info_queue + 1] = G.P_CENTERS.e_negative
+        return { vars = { card.ability.max_highlighted } }
+    end,
+    use = function(self, card, area, copier)
+        G.E_MANAGER:add_event(Event({
+            trigger = 'after',
+            delay = 0.4,
+            func = function()
+                local rift_card = G.hand.highlighted[1]
+                rift_card:set_edition('e_negative', true)
+                card:juice_up(0.3, 0.5)
+                return true
+            end
+        }))
+    end,
+    draw = function(self, card, layer)
+        if (layer == 'card' or layer == 'both') and card.sprite_facing == 'front' then
+            card.children.center:draw_shader('booster', nil, card.ARGS.send_to_shader)
+        end
+    end,
+    can_use = function(self, card)
+        return G.hand and #G.hand.highlighted <= card.ability.max_highlighted and #G.hand.highlighted > 0 and
+            (not G.hand.highlighted[1].edition)
+    end
+}
+
+SMODS.Consumable{
+    key = 'UberSpectral3',
+    set = 'Spectral',
+    atlas = 'Spectral2',
+    pos = { x = 2, y = 0 },
+    loc_txt = {
+        name = 'Vision',
+        text = {
+            'Create up to {C:attention}#1#{}',
+            'Spectral cards',
+            '{C:inactive}(Must have room){}'
+        }
+    },
+    config = { extra = { spectrals = 2 } },
+    loc_vars = function(self, info_queue, card)
+        return { vars = { card.ability.extra.spectrals } }
+    end,
+    use = function(self, card, area, copier)
+        for i = 1, math.min(card.ability.extra.spectrals, G.consumeables.config.card_limit - #G.consumeables.cards) do
+            G.E_MANAGER:add_event(Event({
+                trigger = 'after',
+                delay = 0.4,
+                func = function()
+                    if G.consumeables.config.card_limit > #G.consumeables.cards then
+                        play_sound('timpani')
+                        SMODS.add_card({ set = 'Spectral' })
+                        card:juice_up(0.3, 0.5)
+                    end
+                    return true
+                end
+            }))
+        end
+        delay(0.6)
+    end,
+    can_use = function(self, card)
+        return (G.consumeables and #G.consumeables.cards < G.consumeables.config.card_limit) or
+            (card.area == G.consumeables)
+    end
+}
+
+SMODS.Seal{
+    key = 'UberSeal2',
+    atlas = 'Enhancer',
+    unlocked = true,
+    discovered = true,
+    badge_colour = HEX('990a0a'),
+    pos = {x = 2, y = 1},
+    loc_txt = {
+        name = 'Laughing Seal',
+        text = {
+            '{C:green}#1# in #2#{} chance to create a',
+            'random {C:attention}Joker{} when scored.'
+        },
+        label = 'Laughing Seal'
+    },
+    config = {
+        extra = {
+            numerator = 1,
+            denominator = 7
+        }
+    },
+    loc_vars = function(self, info_queue, card)
+        return { 
+            vars = { 
+                self.config.extra.numerator,
+                self.config.extra.denominator 
+            } 
+        }
+    end,
+    calculate = function(self, card, context)
+        if context.cardarea == G.play and context.main_scoring then
+            if SMODS.pseudorandom_probability(card, 'UberSeal2', self.config.extra.numerator, self.config.extra.denominator) then
+                G.E_MANAGER:add_event(Event({
+                    trigger = 'after',
+                    func = function()
+                        play_sound('timpani')
+                        SMODS.add_card({ set = 'Joker', area = G.jokers, })
+                        return {
+                            message = 'Hahaha!',
+                            colour = G.C.RED,
+                            delay = 0.3,
+                            true
+                        }
+                    end
+                }))
+            end
+        end
+    end
+}
+
+SMODS.Consumable{
+    key = 'UberSpectral4',
+    set = 'Spectral',
+    atlas = 'Spectral2',
+    pos = { x = 0, y = 1 },
+    loc_txt = {
+        name = 'Haze',
+        text = {
+            'Add a {C:attention}Laughing Seal{}',
+            'to {C:attention}#1#{} selected',
+            'card in your hand'
+        }
+    },
+    config = { extra = { seal = 'Uber_UberSeal2' }, max_highlighted = 1 },
+    loc_vars = function(self, info_queue, card)
+        info_queue[#info_queue + 1] = G.P_SEALS[card.ability.extra.seal]
+        return { vars = { card.ability.max_highlighted } }
+    end,
+    use = function(self, card, area, copier)
+        local conv_card = G.hand.highlighted[1]
+        G.E_MANAGER:add_event(Event({
+            func = function()
+                play_sound('tarot1')
+                card:juice_up(0.3, 0.5)
+                return true
+            end
+        }))
+
+        G.E_MANAGER:add_event(Event({
+            trigger = 'after',
+            delay = 0.1,
+            func = function()
+                conv_card:set_seal(card.ability.extra.seal, nil, true)
+                return true
+            end
+        }))
+
+        delay(0.5)
+        G.E_MANAGER:add_event(Event({
+            trigger = 'after',
+            delay = 0.2,
+            func = function()
+                G.hand:unhighlight_all()
+                return true
+            end
+        }))
+    end,
+    draw = function(self, card, layer)
+        if (layer == 'card' or layer == 'both') and card.sprite_facing == 'front' then
+            card.children.center:draw_shader('booster', nil, card.ARGS.send_to_shader)
+        end
+    end
+}
+
 -- New Decks Below
 
 SMODS.Back{
@@ -921,7 +1255,149 @@ SMODS.Back{
 
 -- New Blinds Below
 
--- will do these next update
+SMODS.Blind{
+    key = 'UberBlind1',
+    atlas = 'Blinds',
+    pos = { y = 0 },
+    loc_txt = {
+        name = 'The Power',
+        text = {
+            'All enhanced cards',
+            'are debuffed'
+        }
+    },
+    dollars = 5,
+    mult = 2,
+    boss = { min = 1 },
+    boss_colour = HEX("ee0000"),
+    calculate = function(self, blind, context)
+        if blind.disabled then return end
+        if context.debuff_card and context.debuff_card.area ~= G.jokers then
+            if next(SMODS.get_enhancements(context.debuff_card)) then
+                return {
+                    debuff = true
+                }
+            end
+        end
+    end
+}
+
+SMODS.Blind{
+    key = 'UberBlind2',
+    atlas = 'Blinds',
+    pos = { y = 1 },
+    loc_txt = {
+        name = 'The Weed',
+        text = {
+            'All Non Face cards',
+            'are debuffed'
+        }
+    },
+    dollars = 5,
+    mult = 2,
+    boss = { min = 3 },
+    boss_colour = HEX("1b9f07"), 
+    calculate = function(self, blind, context)
+        if context.debuff_card and context.debuff_card.area ~= G.jokers and not context.debuff_card:is_face(true) then
+            return {
+                debuff = true
+            }
+        end
+    end
+}
+
+SMODS.Blind{
+    key = 'UberBlind3',
+    atlas = 'Blinds',
+    pos = { y = 2 },
+    loc_txt = {
+        name = 'The Bucket',
+        text = {
+            '{C:green}#1# in #2#{} cards get',
+            'drawn debuffed'
+        }
+    },
+    dollars = 5,
+    mult = 2,
+    boss = { min = 2 },
+    boss_colour = HEX("56018b"),
+    config = {
+        extra = {
+            numerator = 1,
+            denominator = 6
+        }
+    },
+    loc_vars = function(self)
+        return { vars = { card.ability.extra.numerator, card.ability.extra.denominator } }
+    end,
+    collection_loc_vars = function(self)
+        return { vars = { '1' } }
+    end,
+    calculate = function(self, blind, context)
+        if blind.disabled then return end
+        if context.debuff_card and context.debuff_card.area ~= G.jokers and SMODS.pseudorandom_probability(blind, 'Uber_UberBlind3', 1, 6) then
+            return {
+                debuff = true
+            }
+        end
+    end
+}
+
+SMODS.Blind{
+    key = 'UberBlind4',
+    atlas = 'Blinds',
+    pos = { y = 3 },
+    loc_txt = {
+        name = 'The Oddity',
+        text = {
+            'All Odd cards',
+            'are debuffed'
+        }
+    },
+    dollars = 5,
+    mult = 2,
+    boss = { min = 1 },
+    boss_colour = HEX("cbcc83"),
+    calculate = function(self, blind, context)
+        if blind.disabled then return end
+        if context.debuff_card and context.debuff_card.area ~= G.jokers then
+            local id = context.debuff_card:get_id()
+            if (id <= 10 and id >= 0 and id % 2 == 1) or (id == 14) then
+                return {
+                    debuff = true
+                }
+            end
+        end
+    end
+}
+
+SMODS.Blind{
+    key = 'UberBlind5',
+    atlas = 'Blinds',
+    pos = { y = 4 },
+    loc_txt = {
+        name = 'The Evening',
+        text = {
+            'All Even cards',
+            'are debuffed'
+        }
+    },
+    dollars = 5,
+    mult = 2,
+    boss = { min = 1 },
+    boss_colour = HEX("cbcc83"),
+    calculate = function(self, blind, context)
+        if blind.disabled then return end
+        if context.debuff_card and context.debuff_card.area ~= G.jokers then
+            local id = context.debuff_card:get_id()
+            if id <= 10 and id >= 0 and id % 2 == 0 then
+                return {
+                    debuff = true
+                }
+            end
+        end
+    end
+}
 
 -- New Jokers Below
 
@@ -1014,7 +1490,8 @@ SMODS.Joker{
 SMODS.Joker{
     key = 'UberJoker3',
     atlas = 'Jokers',
-    rarity = 3,
+    rarity = 2,
+    cost = 6,
     discovered = true,
     pos = {x = 2, y = 0},
     enhancement_gate = 'm_Uber_NewEnhancer3',
@@ -1076,12 +1553,13 @@ SMODS.Joker{
 SMODS.Joker{
     key = 'UberJoker4',
     atlas = 'Jokers',
-    rarity = 3,
+    rarity = 2,
+    cost = 7,
     discovered = true,
     pos = {x = 3, y = 0},
-    enhancement_gate = 'm_Uber_NewEnhancer4',
+    enhancement_gate = {'m_Uber_NewEnhancer4'},
     loc_txt = {
-        name = 'Break Through',
+        name = 'Lone Construct',
         text = {
             'Earn {C:money}$#1#{} when',
             'any number of {C:attention}Brick Cards{} are played',
@@ -1119,6 +1597,774 @@ SMODS.Joker{
         end
     end
 
+}
+
+SMODS.Joker{
+    key = 'UberJoker5',
+    atlas = 'Jokers',
+    rarity = 1,
+    cost = 2,
+    discovered = true,
+    pos = {x = 4, y = 0},
+    loc_txt = {
+        name = 'Magician',
+        text = {
+            '{C:chips}+#1#{} chips',
+            '{C:inactive,s:0.8}Full Name: Malarkey M. Magician{}'
+        }
+    },
+    config = {
+        extra = {
+            chips = 40
+        }
+    },
+    loc_vars = function(self, info_queue, card)
+        return {
+            vars = {
+                card.ability.extra.chips
+            }
+        }
+    end,
+    calculate = function(self, card, context)
+        if context.joker_main then
+            return {
+                chips = card.ability.extra.chips
+            }
+        end
+    end
+}
+
+SMODS.Joker{
+    key = 'UberJoker6',
+    atlas = 'Jokers',
+    rarity = 3,
+    cost = 8,
+    discovered = true,
+    pos = {x = 0, y = 1},
+    loc_txt = {
+        name = 'Cursed Spade',
+        text = {
+            'This card gains {C:chips}+#1#{} chips',
+            'for each {C:attention}Ace{} of {C:spades}Spades{}',
+            'in your {C:attention}full deck{}',
+            '{C:inactive}(Currently{} {C:chips}+#2#{} {C:inactive}chips){}'
+        }
+    },
+    config = {
+        extra = {
+            chips = 70,
+            suit = 'Spades'
+        }
+    },
+    loc_vars = function(self, info_queue, card)
+        local ace_tally = 0
+        if G.playing_cards then
+            for _, playing_card in ipairs(G.playing_cards) do
+                if playing_card:get_id() == 14 and playing_card:is_suit(card.ability.extra.suit) then ace_tally = ace_tally + 1 end
+            end
+        end
+        return {
+            vars = {
+                card.ability.extra.chips,
+                card.ability.extra.chips * ace_tally
+            }
+        }
+    end,
+    calculate = function(self, card, context)
+        if context.joker_main then
+            local ace_tally = 0
+            for _, playing_card in ipairs(G.playing_cards) do
+                if playing_card:get_id() == 14 and playing_card:is_suit(card.ability.extra.suit) then ace_tally = ace_tally + 1 end
+            end
+            return {
+                chips = card.ability.extra.chips * ace_tally
+            }
+        end
+    end
+}
+
+SMODS.Joker{
+    key = 'UberJoker6',
+    atlas = 'Jokers',
+    rarity = 3,
+    cost = 8,
+    discovered = true,
+    pos = {x = 0, y = 1},
+    loc_txt = {
+        name = 'Cursed Spade',
+        text = {
+            'This card gains {C:chips}+#1#{} chips',
+            'for each {C:attention}Ace{} of {C:spades}Spades{}',
+            'in your {C:attention}full deck{}',
+            '{C:inactive}(Currently{} {C:chips}+#2#{} {C:inactive}chips){}'
+        }
+    },
+    config = {
+        extra = {
+            chips = 70,
+            suit = 'Spades'
+        }
+    },
+    loc_vars = function(self, info_queue, card)
+        local ace_tally = 0
+        if G.playing_cards then
+            for _, playing_card in ipairs(G.playing_cards) do
+                if playing_card:get_id() == 14 and playing_card:is_suit(card.ability.extra.suit) then ace_tally = ace_tally + 1 end
+            end
+        end
+        return {
+            vars = {
+                card.ability.extra.chips,
+                card.ability.extra.chips * ace_tally
+            }
+        }
+    end,
+    calculate = function(self, card, context)
+        if context.joker_main then
+            local ace_tally = 0
+            for _, playing_card in ipairs(G.playing_cards) do
+                if playing_card:get_id() == 14 and playing_card:is_suit(card.ability.extra.suit) then ace_tally = ace_tally + 1 end
+            end
+            return {
+                chips = card.ability.extra.chips * ace_tally
+            }
+        end
+    end
+}
+
+SMODS.Joker{
+    key = 'UberJoker7',
+    atlas = 'Jokers',
+    rarity = 3,
+    cost = 8,
+    discovered = true,
+    pos = {x = 1, y = 1},
+    loc_txt = {
+        name = 'Brilliant Diamond',
+        text = {
+            'Earn {C:money}$#1#{} for each',
+            '{C:attention}Ace{} of {C:diamonds}Diamonds{} in your {C:attention}full deck{}',
+            'at end of round',
+            '{C:inactive}(Currently{} {C:money}+$#2#{}{C:inactive}){}'
+        }
+    },
+    config = {
+        extra = {
+            dollars = 4,
+            suit = 'Diamonds'
+        }
+    },
+    loc_vars = function(self, info_queue, card)
+        local ace_tally = 0
+        if G.playing_cards then
+            for _, playing_card in ipairs(G.playing_cards) do
+                if playing_card:get_id() == 14 and playing_card:is_suit(card.ability.extra.suit) then ace_tally = ace_tally + 1 end
+            end
+        end
+        return {
+            vars = {
+                card.ability.extra.dollars,
+                card.ability.extra.dollars * ace_tally
+            }
+        }
+    end,
+    calc_dollar_bonus = function(self, card)
+        local ace_tally = 0
+        for _, playing_card in ipairs(G.playing_cards) do
+            if playing_card:get_id() == 14 and playing_card:is_suit(card.ability.extra.suit) then 
+                ace_tally = ace_tally + 1 
+            end
+        end
+        return ace_tally > 0 and card.ability.extra.dollars * ace_tally or nil
+    end
+}
+
+SMODS.Joker{
+    key = 'UberJoker8',
+    atlas = 'Jokers',
+    rarity = 3,
+    cost = 8,
+    discovered = true,
+    pos = {x = 2, y = 1},
+    loc_txt = {
+        name = 'Broken Heart',
+        text = {
+            'This card gains {X:mult,C:white}+X#1#{} mult',
+            'for each {C:attention}Ace{} of {C:hearts}Hearts{}',
+            'in your {C:attention}full deck{}',
+            '{C:inactive}(Currently{} {X:mult,C:white}X#2#{} {C:inactive}mult){}'
+        }
+    },
+    config = {
+        extra = {
+            xmult = 0.6,
+            suit = 'Hearts'
+        }
+    },
+    loc_vars = function(self, info_queue, card)
+        local ace_tally = 0
+        if G.playing_cards then
+            for _, playing_card in ipairs(G.playing_cards) do
+                if playing_card:get_id() == 14 and playing_card:is_suit(card.ability.extra.suit) then ace_tally = ace_tally + 1 end
+            end
+        end
+        return {
+            vars = {
+                card.ability.extra.xmult,
+                1 + card.ability.extra.xmult * ace_tally
+            }
+        }
+    end,
+    calculate = function(self, card, context)
+        if context.joker_main then
+            local ace_tally = 0
+            for _, playing_card in ipairs(G.playing_cards) do
+                if playing_card:get_id() == 14 and playing_card:is_suit(card.ability.extra.suit) then ace_tally = ace_tally + 1 end
+            end
+            return {
+                x_mult = 1 + card.ability.extra.xmult * ace_tally
+            }
+        end
+    end
+}
+
+SMODS.Joker{
+    key = 'UberJoker9',
+    atlas = 'Jokers',
+    rarity = 3,
+    cost = 8,
+    discovered = true,
+    pos = {x = 3, y = 1},
+    loc_txt = {
+        name = 'Overgrown Club',
+        text = {
+            'This card gains {C:mult}+#1#{} mult',
+            'for each {C:attention}Ace{} of {C:clubs}Clubs{}',
+            'in your {C:attention}full deck{}',
+            '{C:inactive}(Currently{} {C:mult}+#2#{} {C:inactive}mult){}'
+        }
+    },
+    config = {
+        extra = {
+            mult = 12,
+            suit = 'Clubs'
+        }
+    },
+    loc_vars = function(self, info_queue, card)
+        local ace_tally = 0
+        if G.playing_cards then
+            for _, playing_card in ipairs(G.playing_cards) do
+                if playing_card:get_id() == 14 and playing_card:is_suit(card.ability.extra.suit) then ace_tally = ace_tally + 1 end
+            end
+        end
+        return {
+            vars = {
+                card.ability.extra.mult,
+                card.ability.extra.mult * ace_tally
+            }
+        }
+    end,
+    calculate = function(self, card, context)
+        if context.joker_main then
+            local ace_tally = 0
+            for _, playing_card in ipairs(G.playing_cards) do
+                if playing_card:get_id() == 14 and playing_card:is_suit(card.ability.extra.suit) then ace_tally = ace_tally + 1 end
+            end
+            return {
+                mult = card.ability.extra.mult * ace_tally
+            }
+        end
+    end
+}
+
+SMODS.Joker{
+    key = 'UberJoker10',
+    atlas = 'Jokers',
+    rarity = 3,
+    cost = 12,
+    discovered = true,
+    blueprint_compat = false,
+    pos = {x = 4, y = 1},
+    loc_txt = {
+        name = 'Bingo Card',
+        text = {
+            'After {C:attention}#1#{} {C:inactive}(#2#){} cards played,',
+            'receive a random {C:attention,E:1}PRIZE!{}',
+            '{C:green}#3# in #4#{} chance for card count',
+            'to reset after each hand'
+        }
+    },
+    config = {
+        extra = {
+            cards = 24,
+            current_cards = 0,
+            numerator = 1,
+            denominator = 6,
+            dollars = 15,
+        }
+    },
+    loc_vars = function(self, info_queue, card)
+        return { 
+            vars = { 
+                card.ability.extra.cards, 
+                card.ability.extra.current_cards, 
+                card.ability.extra.numerator, 
+                card.ability.extra.denominator,
+                
+            } 
+        }
+    end,
+    calculate = function(self, card, context)
+        local money_gain = false
+        if context.before and context.full_hand then
+            card.ability.extra.current_cards = card.ability.extra.current_cards + #context.full_hand
+            if SMODS.pseudorandom_probability(card, 'UberJoker10', card.ability.extra.numerator, card.ability.extra.denominator) then
+                card.ability.extra.current_cards = 0
+                return {
+                    message = 'Unlucky!',
+                    colour = G.C.RED,
+                    delay = 0.3,
+                    nil,
+                    true
+                }
+            end
+            if card.ability.extra.current_cards >= card.ability.extra.cards then
+                card.ability.extra.current_cards = card.ability.extra.current_cards - card.ability.extra.cards
+                money_gain = true
+                if SMODS.pseudorandom_probability(card, 'UberJoker10', 1, 12) then
+                    SMODS.add_card({ set = 'Joker', area = G.jokers, rarity = 2, edition = 'e_negative' })
+                    SMODS.add_card({ set = 'Joker', area = G.jokers, rarity = 3, edition = 'e_negative' })
+                end
+                if SMODS.pseudorandom_probability(card, 'UberJoker10', 1, 8) then
+                    G.E_MANAGER:add_event(Event({
+                        trigger = 'after',
+                        delay = 0.4,
+                        func = function()
+                            play_sound('timpani')
+                            SMODS.add_card({ set = 'Spectral', edition = 'e_negative' })
+                            SMODS.add_card({ set = 'Spectral', edition = 'e_negative' })
+                            SMODS.add_card({ set = 'Spectral', edition = 'e_negative' })
+                            card:juice_up(0.3, 0.5)
+                            return true
+                        end
+                    }))
+                end
+                if SMODS.pseudorandom_probability(card, 'UberJoker10', 1, 5) then
+                    G.E_MANAGER:add_event(Event({
+                        trigger = 'after',
+                        delay = 0.4,
+                        func = function()
+                            play_sound('timpani')
+                            SMODS.add_card({ set = 'Tarot', edition = 'e_negative' })
+                            SMODS.add_card({ set = 'Tarot', edition = 'e_negative' })
+                            SMODS.add_card({ set = 'Tarot', edition = 'e_negative' })
+                            card:juice_up(0.3, 0.5)
+                            return true
+                        end
+                    }))
+                end
+                if SMODS.pseudorandom_probability(card, 'UberJoker10', 1, 3) then
+                    G.E_MANAGER:add_event(Event({
+                        trigger = 'after',
+                        delay = 0.4,
+                        func = function()
+                            play_sound('timpani')
+                            SMODS.add_card({ set = 'Planet', edition = 'e_negative' })
+                            SMODS.add_card({ set = 'Planet', edition = 'e_negative' })
+                            SMODS.add_card({ set = 'Planet', edition = 'e_negative' })
+                            card:juice_up(0.3, 0.5)
+                            return true
+                        end
+                    }))
+                end
+                return {
+                    message = "BINGO!",
+                    colour = G.C.GOLD,
+                    delay = 0.3,
+                    dollars = card.ability.extra.dollars
+                }
+            end
+        end
+    end
+}
+
+SMODS.Joker{
+    key = 'UberJoker11',
+    atlas = 'Jokers',
+    rarity = 2,
+    cost = 5,
+    discovered = true,
+    blueprint_compat = true,
+    pos = {x = 2, y = 2},
+    loc_txt = {
+        name = {
+            'Steak in the',
+            'shape of Jimbo'
+        },
+        text = {
+            '{C:mult}+#1#{} mult',
+            '{C:mult}-#2#{} mult when any',
+            '{C:attention}consumable{} is used'
+        }
+    },
+    config = {
+        extra = {
+            mult = 60,
+            subtraction = 10
+        }
+    },
+    loc_vars = function(self, info_queue, card)
+        return { 
+            vars = { 
+                card.ability.extra.mult, 
+                card.ability.extra.subtraction
+            } 
+        }
+    end,
+    calculate = function(self, card, context)
+        if context.using_consumeable and not context.blueprint then 
+            if card.ability.extra.mult - card.ability.extra.subtraction <= 0 then
+                SMODS.destroy_cards(card, nil, nil, true)
+                return {
+                    message = localize('k_eaten_ex'),
+                    colour = G.C.RED
+                }
+            else
+                card.ability.extra.mult = card.ability.extra.mult - card.ability.extra.subtraction
+                return {
+                    message = localize { type = 'variable', key = 'a_mult_minus', vars = { card.ability.extra.subtraction } },
+                    colour = G.C.RED
+                }
+            end
+        end
+        if context.joker_main then
+            return {
+                mult = card.ability.extra.mult
+            }
+        end
+    end
+}
+
+SMODS.Joker{
+    key = 'UberJoker12',
+    atlas = 'Jokers',
+    rarity = 2,
+    cost = 12,
+    discovered = true,
+    pos = {x = 3, y = 2},
+    loc_txt = {
+        name = 'Conspiracy Theorist',
+        text = {
+            'Retrigger all played {C:dark_edition}Foil Edition{}',
+            'cards and Jokers {C:inactive}(excluding self){}',
+            'This joker is always {C:dark_edition}Foil{}'
+        }
+    },
+    calculate = function(self, card, context)
+        if context.retrigger_joker_check and (context.other_card.edition or {}).foil and context.other_card ~= card then
+            return {
+                repetitions = 1
+            }
+        end
+        if context.repetition and context.cardarea == G.play and (context.other_card.edition or {}).foil then
+            return {
+                repetitions = 1
+            }
+        end
+    end,
+    set_ability = function (self, card)
+        card:set_edition("e_foil")
+    end
+}
+
+SMODS.Joker{
+    key = 'UberJoker13',
+    atlas = 'Jokers',
+    rarity = 2,
+    cost = 8,
+    discovered = true,
+    pos = {x = 4, y = 2},
+    loc_txt = {
+        name = 'Lost Black Card',
+        text = {
+            '{C:gold,E:1}Doesnt Take Up Space{}',
+            '{C:attention}+#1#{} Joker Slot',
+            '{C:red}#2#{} Hand'
+        }
+    },
+    config = {
+        extra_slots_used = -1,
+        card_limit = 1,
+        extra = {
+            hands = -1
+        }
+    },
+    loc_vars = function(self, info_queue, card)
+        return { 
+            vars = { 
+                card.ability.extra.card_limit,
+                card.ability.extra.hands
+            } 
+        }
+    end,
+    remove_from_deck = function(self, card, from_debuff)
+        G.GAME.round_resets.hands = G.GAME.round_resets.hands - card.ability.extra.hands
+        ease_hands_played(-card.ability.extra.hands)
+    end,
+    add_to_deck = function(self, card, from_debuff)
+        G.GAME.round_resets.hands = G.GAME.round_resets.hands + card.ability.extra.hands
+        ease_hands_played(card.ability.extra.hands)
+    end
+}
+
+SMODS.Joker{
+    key = 'UberJoker14',
+    atlas = 'Jokers',
+    rarity = 2,
+    cost = 8,
+    discovered = true,
+    pos = {x = 2, y = 3},
+    loc_txt = {
+        name = 'Linear Joker',
+        text = {
+            'If scored hand is a',
+            '{C:attention}Straight Flush{}, earn {C:money}$15{}'
+        }
+    },
+    config = {
+        extra = {
+            dollars = 15
+        }
+    },
+    calculate = function(self, card, context)
+        if context.before and next(context.poker_hands['Straight Flush']) then
+            return {
+                dollars = card.ability.extra.dollars
+            }
+        end
+    end
+}
+
+SMODS.Joker{
+    key = 'UberJoker15',
+    atlas = 'Jokers',
+    rarity = 2,
+    cost = 8,
+    discovered = true,
+    pos = {x = 3, y = 3},
+    loc_txt = {
+        name = 'Ferrous Flow',
+        text = {
+            '{C:attention}Gold{} and {C:attention}Bronze{} cards',
+            'held in hand give',
+            '{X:mult,C:white}X#1#{} Mult'
+        }
+    },
+    config = {
+        extra = {
+            x_mult = 1.5
+        }
+    },
+    loc_vars = function(self, info_queue, card)
+        return { 
+            vars = { 
+                card.ability.extra.x_mult
+            } 
+        }
+    end,
+    calculate = function(self, card, context)
+        if context.individual and context.cardarea == G.hand and not context.end_of_round then
+            if SMODS.has_enhancement(context.other_card, 'm_gold') or SMODS.has_enhancement(context.other_card, 'm_Uber_NewEnhancer1') then
+                return {
+                    x_mult = card.ability.extra.x_mult
+                }
+            end
+        end
+    end
+}
+
+SMODS.Joker{
+    key = 'UberJoker16',
+    atlas = 'Jokers',
+    rarity = 1,
+    cost = 4,
+    discovered = true,
+    pos = {x = 4, y = 3},
+    loc_txt = {
+        name = 'Blank Joker',
+        text = {
+            'Create a random {C:attention}Joker{}',
+            'when sold'
+        }
+    },
+    calculate = function(self, card, context)
+        if context.selling_card and context.card then
+            G.E_MANAGER:add_event(Event({
+                trigger = 'after',
+                func = function()
+                    play_sound('timpani')
+                    SMODS.add_card({ set = 'Joker', area = G.jokers, })
+                    return true
+                end
+            }))
+        end
+    end
+}
+
+SMODS.Joker{
+    key = 'UberLegend1',
+    atlas = 'Jokers',
+    rarity = 4,
+    cost = 20,
+    discovered = false,
+    blueprint_compat = false,
+    pos = {x = 0, y = 2},
+    soul_pos = {x = 0, y = 3},
+    loc_txt = {
+        name = 'Vestea',
+        text = {
+            '{X:edition,C:dark_edition,s:1.2}^#1#{} {C:mult}Mult{} and {X:edition,C:dark_edition,s:1.2}^#2#{} {C:chips}Chips{}',
+            'if your full deck contains',
+            'at least {C:attention}6{} {C:inactive}(#3#){} {C:gold}Gold Cards{}',
+            '{C:inactive,s:0.8}This joker stands alone{}'
+        }
+    },
+    config = {
+        extra = {
+            e_mult = 1.618,
+            e_chips = 1.618,
+        }
+    },
+    loc_vars = function(self, info_queue, card)
+        local gold_tally = 0
+        for _, playing_card in pairs(G.playing_cards or {}) do
+            if SMODS.has_enhancement(playing_card, "m_gold") then gold_tally = gold_tally + 1 end
+        end
+        return {
+            vars = {
+                card.ability.extra.e_mult,
+                card.ability.extra.e_chips,
+                gold_tally
+            }
+        }
+    end,
+    calculate = function(self, card, context)
+        if context.joker_main then
+            local gold_tally = 0
+            for _, playing_card in pairs(G.playing_cards or {}) do
+                if SMODS.has_enhancement(playing_card, "m_gold") then gold_tally = gold_tally + 1 end
+            end
+            if gold_tally >= 6 then
+                return {
+                    emult = card.ability.extra.e_mult,
+                    echips = card.ability.extra.e_chips
+                }
+            end
+        end
+        if #SMODS.find_card(self.key) >= 2 and context.debuff_card and context.debuff_card == card then
+            return {debuff = true}
+        end
+    end
+}
+
+SMODS.Joker{
+    key = 'UberLegend2',
+    atlas = 'Jokers',
+    rarity = 4,
+    cost = 20,
+    discovered = false,
+    blueprint_compat = true,
+    pos = {x = 1, y = 2},
+    soul_pos = {x = 1, y = 3},
+    loc_txt = {
+        name = 'Foole',
+        text = {
+            '{X:chips,C:white}+X#1#{} Chips for each {C:tarot}Tarot{} card used',
+            '{X:mult,C:white}+X#2#{} Mult for each {C:spectral}Spectral{} card used',
+            '{C:money}+$#3#{} for each {C:planet}Planet{} card used',
+            '{C:red}#4#{} to {C:chips}XChips{} and {C:mult}XMult{} and',
+            '{C:red}#5#{} {C:money}dollars{} every ante',
+            '{C:inactive}(currently{} {X:chips,C:white}X#6#{} {C:inactive}chips,{} {X:mult,C:white}X#7#{} {C:inactive}mult, and{} {C:money}+$#8#{} {C:inactive}){}'
+        }
+    },
+    config = {
+        extra = {
+            x_chips = 1,
+            x_mult = 1,
+            dollars = 1,
+            subtraction1 = -0.5,
+            subtraction2 = -1,
+            current_x_chips = 1,
+            current_x_mult = 1,
+            current_dollars = 0,
+        }
+    },
+    calculate = function(self, card, context)
+        if context.using_consumeable and not context.blueprint and context.consumeable.ability.set == 'Tarot' then
+            card.ability.extra.current_x_chips = card.ability.extra.current_x_chips + card.ability.extra.x_chips
+            return {
+                message = 'XChips!',
+                colour = G.C.CHIPS,
+                delay = 0.2
+            }
+        end
+        if context.using_consumeable and not context.blueprint and context.consumeable.ability.set == 'Spectral' then
+            card.ability.extra.current_x_mult = card.ability.extra.current_x_mult + card.ability.extra.x_mult
+            return {
+                message = 'XMult!',
+                colour = G.C.MULT,
+                delay = 0.2
+            }
+        end
+        if context.using_consumeable and not context.blueprint and context.consumeable.ability.set == 'Planet' then
+            card.ability.extra.current_dollars = card.ability.extra.current_dollars + card.ability.extra.dollars
+            return {
+                message = 'Dollars!',
+                colour = G.C.MONEY,
+                delay = 0.2
+            }
+        end
+        if context.ante_change and not context.blueprint and context.ante_end == true then
+            card.ability.extra.current_x_chips = card.ability.extra.current_x_chips + card.ability.extra.subtraction1
+            card.ability.extra.current_x_mult = card.ability.extra.current_x_mult + card.ability.extra.subtraction1
+            card.ability.extra.current_dollars = card.ability.extra.current_dollars + card.ability.extra.subtraction2
+            if card.ability.extra.current_x_chips <= 0.5 then
+                card.ability.extra.current_x_chips = 1
+            end
+            if card.ability.extra.current_x_mult <= 0.5 then
+                card.ability.extra.current_x_mult = 1
+            end
+            if card.ability.extra.current_dollars <= -1 then
+                card.ability.extra.current_dollars = 0
+            end
+            return {
+                message = 'Subtracted!',
+                colour = G.C.RED,
+                delay = 0.2
+            }
+        end
+        if context.joker_main then
+            return {
+                x_chips = card.ability.extra.current_x_chips,
+                x_mult = card.ability.extra.current_x_mult,
+                dollars = card.ability.extra.current_dollars
+            }
+        end
+    end,
+    loc_vars = function(self, info_queue, card)
+        return { 
+            vars = { 
+                card.ability.extra.x_chips, 
+                card.ability.extra.x_mult, 
+                card.ability.extra.dollars,
+                card.ability.extra.subtraction1,
+                card.ability.extra.subtraction2,
+                card.ability.extra.current_x_chips,
+                card.ability.extra.current_x_mult,
+                card.ability.extra.current_dollars
+            } 
+        }
+    end
 }
 
 -- New Vouchers Below
