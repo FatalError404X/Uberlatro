@@ -32,7 +32,7 @@ SMODS.Atlas{
     px = 34,
     py = 34,
     atlas_table ='ANIMATION_ATLAS',
-    frames = 18,
+    frames = 21,
     fps = 10
 }
 
@@ -1044,19 +1044,27 @@ SMODS.Seal{
     calculate = function(self, card, context)
         if context.cardarea == G.play and context.main_scoring then
             if SMODS.pseudorandom_probability(card, 'UberSeal2', self.config.extra.numerator, self.config.extra.denominator) then
-                G.E_MANAGER:add_event(Event({
-                    trigger = 'after',
-                    func = function()
-                        play_sound('timpani')
-                        SMODS.add_card({ set = 'Joker', area = G.jokers, })
-                        return {
-                            message = 'Hahaha!',
-                            colour = G.C.RED,
-                            delay = 0.3,
-                            true
-                        }
-                    end
-                }))
+                if G.jokers.config.card_limit > #G.jokers.cards then
+                    G.E_MANAGER:add_event(Event({
+                        trigger = 'after',
+                        func = function()
+                            play_sound('timpani')
+                            SMODS.add_card({ set = 'Joker', area = G.jokers, })
+                            return {
+                                message = 'Hahaha!',
+                                colour = HEX('990a0a'),
+                                delay = 0.3,
+                                true
+                            }
+                        end
+                    }))
+                else 
+                    return {
+                        message = 'No Room!',
+                        colour = G.C.ATTENTION,
+                        delay = 0.3
+                    }
+                end
             end
         end
     end
@@ -1395,6 +1403,144 @@ SMODS.Blind{
                     debuff = true
                 }
             end
+        end
+    end
+}
+
+SMODS.Blind{
+    key = 'UberBlind6',
+    atlas = 'Blinds',
+    pos = { y = 5 },
+    loc_txt = {
+        name = 'The Lesser',
+        text = {
+            '-#1# hand',
+            '-#2# discard'
+        }
+    },
+    config = {
+        extra = {
+            subtraction = 1
+        }
+    },
+    loc_vars = function(self)
+        return { vars = { self.config.extra.subtraction, self.config.extra.subtraction } }
+    end,
+    dollars = 5,
+    mult = 2,
+    boss = { min = 1 },
+    boss_colour = HEX("ec5800"),
+    calculate = function(self, blind, context)
+        if context.blind_disabled then
+            ease_discard(blind.effect.discards_sub)
+            ease_hands_played(blind.effect.hands_sub)
+        end
+
+        if blind.disabled then return end
+
+        if context.setting_blind then
+            blind.effect.discards_sub = self.config.extra.subtraction
+            blind.effect.hands_sub = self.config.extra.subtraction
+            ease_discard(-blind.effect.discards_sub)
+            ease_hands_played(-blind.effect.hands_sub)
+        end
+    end
+}
+
+SMODS.Blind{
+    key = 'UberBossBlind1',
+    atlas = 'Blinds',
+    pos = { y = 6 },
+    loc_txt = {
+        name = 'Greater Grime',
+        text = {
+            'Greater Difficulty',
+            'Less hands and discards'
+        }
+    },
+    dollars = 8,
+    mult = 3,
+    boss = { showdown = true },
+    boss_colour = HEX("344019"),
+    config = {
+        extra = {
+            subtraction = 2
+        }
+    },
+    calculate = function(self, blind, context)
+        if context.blind_disabled then
+            ease_discard(blind.effect.discards_sub)
+            ease_hands_played(blind.effect.hands_sub)
+        end
+
+        if blind.disabled then return end
+
+        if context.setting_blind then
+            blind.effect.discards_sub = self.config.extra.subtraction
+            blind.effect.hands_sub = self.config.extra.subtraction
+            ease_discard(-blind.effect.discards_sub)
+            ease_hands_played(-blind.effect.hands_sub)
+        end
+    end
+}
+
+SMODS.Blind{
+    key = 'UberBossBlind2',
+    atlas = 'Blinds',
+    pos = { y = 7 },
+    loc_txt = {
+        name = 'Citric Cleanse',
+        text = {
+            'Enhancements and Seals are removed',
+            'from cards before scoring'
+        }
+    },
+    dollars = 8,
+    mult = 1.5,
+    boss = { showdown = true },
+    boss_colour = HEX("ec5800"),
+    calculate = function(self, blind, context)
+        if blind.disabled then return end
+
+        if context.press_play then
+            G.E_MANAGER:add_event(Event({
+                trigger = 'after',
+                delay = 0.2,
+                func = function()
+                    for i = 1, #G.play.cards do
+                        G.E_MANAGER:add_event(Event({
+                            func = function()
+                                G.play.cards[i]:juice_up()
+                                return true
+                            end
+                        }))
+                        G.play.cards[i]:set_seal(nil, false, true)
+                        G.play.cards[i]:set_ability('c_base', false, true)
+                        delay(0.23)
+                    end
+                    return true
+                end
+            }))
+            blind.triggered = true 
+            G.E_MANAGER:add_event(Event({
+                trigger = 'immediate',
+                func = (function()
+                    SMODS.juice_up_blind()
+                    G.E_MANAGER:add_event(Event({
+                        trigger = 'after',
+                        delay = 0.06 * G.SETTINGS.GAMESPEED,
+                        blockable = false,
+                        blocking = false,
+                        func = function()
+                            play_sound('tarot2', 0.76, 0.4)
+                            return true
+                        end
+                    }))
+                    play_sound('tarot2', 1, 0.4)
+                    return true
+                end)
+            }))
+            delay(0.4)
         end
     end
 }
@@ -2620,6 +2766,35 @@ SMODS.Tag{
             tag:yep('+', G.C.SECONDARY_SET.spectral, function()
                 local booster = SMODS.add_booster_to_shop(nil, true)
                 booster.from_tag = true
+                return true
+            end)
+            tag.triggered = true
+        end
+    end
+}
+
+SMODS.Tag{
+    key = 'UberTag5',
+    atlas = 'Tags',
+    pos = {x = 1, y = 1},
+    loc_txt = {
+        name = 'Fission Tag',
+        text = {
+            'Splits into two random',
+            '{C:attention}Skip Tags{}',
+            'at the end of round'
+        }
+    },
+    apply = function(self, tag, context)
+        if context.type == 'new_blind_choice' then
+            tag:yep('+', G.C.SECONDARY_SET.Tarot, function()
+                add_tag(Tag(get_next_tag_key('ubertagrandom')))
+                play_sound('generic1', 0.9 + math.random() * 0.1, 0.8)
+                play_sound('holo1', 1.2 + math.random() * 0.1, 0.4)
+                delay(0.5)
+                add_tag(Tag(get_next_tag_key('ubertagrandom')))
+                play_sound('generic1', 0.9 + math.random() * 0.1, 0.8)
+                play_sound('holo1', 1.2 + math.random() * 0.1, 0.4)
                 return true
             end)
             tag.triggered = true
