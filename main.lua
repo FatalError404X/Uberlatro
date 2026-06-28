@@ -1261,6 +1261,46 @@ SMODS.Back{
     end
 }
 
+SMODS.Back{
+    key = 'UberDeck5',
+    atlas = 'Decks',
+    pos = {x = 2, y = 1},
+    unlocked = true,
+    loc_txt = {
+        name = 'Charged Deck',
+        text = {
+            'All cards start with',
+            'random {C:attention}enhancements{}',
+            '{C:red}3X{} Blind requirement',
+            '{C:red}#1#{} joker slot',
+        }
+    },
+    config = {
+        ante_scaling = 3,
+        extra = {
+            joker_slot = -1
+        }
+    },
+    loc_vars = function(self, info_queue, back)
+        return { 
+            vars = {
+                self.config.extra.joker_slot
+            } 
+        }
+    end,
+    apply = function(self, back)
+        G.E_MANAGER:add_event(Event({
+            func = function()
+                if not G.playing_cards then return false end
+                for k, v in pairs(G.playing_cards) do
+                    v:set_ability(SMODS.poll_enhancement({key = self.key, guaranteed = true}))
+                end
+                return true
+            end
+        }))
+    end
+}
+
 -- New Blinds Below
 
 SMODS.Blind{
@@ -1321,8 +1361,8 @@ SMODS.Blind{
     loc_txt = {
         name = 'The Bucket',
         text = {
-            '{C:green}#1# in #2#{} cards get',
-            'drawn debuffed'
+            '{C:green}1 in 7{} chance',
+            'cards are drawn debuffed'
         }
     },
     dollars = 5,
@@ -1335,9 +1375,6 @@ SMODS.Blind{
             denominator = 6
         }
     },
-    loc_vars = function(self)
-        return { vars = { card.ability.extra.numerator, card.ability.extra.denominator } }
-    end,
     collection_loc_vars = function(self)
         return { vars = { '1' } }
     end,
@@ -1414,18 +1451,15 @@ SMODS.Blind{
     loc_txt = {
         name = 'The Lesser',
         text = {
-            '-#1# hand',
-            '-#2# discard'
+            '-1 hand',
+            '-1 discard'
         }
     },
     config = {
         extra = {
-            subtraction = 1
+            subtraction = 1,
         }
     },
-    loc_vars = function(self)
-        return { vars = { self.config.extra.subtraction, self.config.extra.subtraction } }
-    end,
     dollars = 5,
     mult = 2,
     boss = { min = 1 },
@@ -1459,7 +1493,7 @@ SMODS.Blind{
         }
     },
     dollars = 8,
-    mult = 3,
+    mult = 3.5,
     boss = { showdown = true },
     boss_colour = HEX("344019"),
     config = {
@@ -2156,7 +2190,7 @@ SMODS.Joker{
     config = {
         extra = {
             mult = 60,
-            subtraction = 10
+            subtraction = 15
         }
     },
     loc_vars = function(self, info_queue, card)
@@ -2248,7 +2282,7 @@ SMODS.Joker{
     loc_vars = function(self, info_queue, card)
         return { 
             vars = { 
-                card.ability.extra.card_limit,
+                card.ability.card_limit,
                 card.ability.extra.hands
             } 
         }
@@ -2780,9 +2814,8 @@ SMODS.Tag{
     loc_txt = {
         name = 'Fission Tag',
         text = {
-            'Splits into two random',
-            '{C:attention}Skip Tags{}',
-            'at the end of round'
+            'Splits into two ',
+            'random {C:attention}Skip Tags{}',
         }
     },
     apply = function(self, tag, context)
